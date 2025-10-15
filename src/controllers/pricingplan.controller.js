@@ -1,5 +1,5 @@
 import { PricingPlan } from "../models/pricingplan.model.js"; // Adjust path as needed
-import { asyncHandler } from "../utils/asyncHandler.js";
+import { asyncHandler } from "../utils/AsyncHandler.js";
 import { AppError } from "../utils/AppError.js";
 import { AppSuccess } from "../utils/AppSuccess.js";
 

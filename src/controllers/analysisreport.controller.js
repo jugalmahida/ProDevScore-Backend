@@ -3,7 +3,7 @@ import { reviewCodeandGetSummary } from "../config/agent.config.js";
 import { getIO } from "../config/socket.config.js";
 import { AppError } from "../utils/AppError.js";
 import { AppSuccess } from "../utils/AppSuccess.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
+import { asyncHandler } from "../utils/AsyncHandler.js";
 
 export const generateAnalysisScore = asyncHandler(async (req, res, next) => {
   const { githubUrl, login, topCommits, startDate, endDate, socketId } =
@@ -60,7 +60,7 @@ export const generateAnalysisScore = asyncHandler(async (req, res, next) => {
   // Emit start event to specific client
   io.to(socketId).emit("reviewStarted", {
     total: filteredCommits.length,
-    message: "Starting code review process..."
+    message: "Starting code review process...",
   });
 
   // Review commits one by one, emit progress to the client
@@ -99,13 +99,13 @@ export const generateAnalysisScore = asyncHandler(async (req, res, next) => {
       // console.log(`Reviewed commit ${i + 1}/${filteredCommits.length} for socket ${socketId}`);
     } catch (error) {
       console.error("Failed to parse review JSON:", error);
-      
+
       const errorResult = {
         sha: commit.sha,
         review: `Error: Failed to parse AI response - ${error.message}`,
         score: null,
       };
-      
+
       reviewResults.push(errorResult);
 
       // Emit error for this specific commit
@@ -165,10 +165,10 @@ export const getContributorsData = asyncHandler(async (req, res, next) => {
   if (!githubUrl) {
     return AppError.badRequest("Github Url is missing");
   }
-  
+
   const contributorUrl = githubUrl.replace("https://github.com", "");
   const finalUrl = `/repos${contributorUrl}/contributors`;
-  
+
   const response = await apiClient.get(finalUrl);
   AppSuccess.ok(response.data).send(res);
 });

@@ -2,7 +2,7 @@ import { User } from "../models/user.model.js";
 import { UserSubscriptions } from "../models/usersubscriptions.model.js";
 import { PricingPlan } from "../models/pricingplan.model.js";
 import { AppError } from "../utils/AppError.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
+import { asyncHandler } from "../utils/AsyncHandler.js";
 import { AppSuccess } from "../utils/AppSuccess.js";
 import { AppConstants } from "../utils/Constants.js";
 import jwt from "jsonwebtoken";
