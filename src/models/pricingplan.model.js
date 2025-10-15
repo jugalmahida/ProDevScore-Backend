@@ -12,7 +12,7 @@ const pricingPlanSchema = new mongoose.Schema({
   tier: {
     type: String,
     required: true,
-    enum: ["free", "basic", "pro"],
+    enum: ["free", "pro"],
   },
   isPopular: { type: Boolean, default: false },
   limits: {
@@ -20,11 +20,19 @@ const pricingPlanSchema = new mongoose.Schema({
       type: Number,
       required: true,
       min: 0,
+      default: 1,
+    },
+    contributors: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 2,
     },
     commits: {
       type: Number,
       required: true,
       min: 0,
+      default: 3,
     },
   },
 });

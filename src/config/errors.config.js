@@ -11,14 +11,14 @@ export const setupErrorHandling = (app) => {
 
   // Global error handler
   app.use((err, req, res, next) => {
-    console.error("Global error handler:", {
-      error: err.message,
-      stack: err.stack,
-      url: req.url,
-      method: req.method,
-      ip: req.ip,
-      timestamp: new Date().toISOString(),
-    });
+    // console.error("Global error handler:", {
+    //   error: err.message,
+    //   stack: err.stack,
+    //   url: req.url,
+    //   method: req.method,
+    //   ip: req.ip,
+    //   timestamp: new Date().toISOString(),
+    // });
 
     const isDevelopment = process.env.NODE_ENV === "development";
 
