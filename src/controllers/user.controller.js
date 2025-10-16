@@ -145,6 +145,7 @@ export const registerAdmin = asyncHandler(async (req, res, next) => {
   });
 
   newUser.password = undefined;
+  newUser.role = undefined;
 
   AppSuccess.ok(newUser).send(res);
 });
@@ -177,6 +178,7 @@ export const loginUser = asyncHandler(async (req, res, next) => {
   user.password = undefined;
   user.__v = undefined;
   user.refreshToken = undefined;
+  user.role = undefined;
 
   const userWithTokens = {
     user,

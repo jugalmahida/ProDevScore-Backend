@@ -5,10 +5,18 @@ import {
   getContributorsData,
 } from "../controllers/analysisreport.controller.js";
 
+import {
+  authMiddleware,
+  isAdmin,
+  isAdminOrUser,
+} from "../middleware/auth.middleware.js";
+
 const router = express.Router();
 
-router.post("/getContributors", getContributorsData);
-router.post("/analysis", generateAnalysisScore);
-router.post("/gridcommits", generateGridCommitsData);
+router.use(authMiddleware);
+
+router.post("/getContributors", isAdminOrUser, getContributorsData);
+router.post("/analysis", isAdminOrUser, generateAnalysisScore);
+router.post("/gridcommits", isAdminOrUser, generateGridCommitsData);
 
 export default router;
