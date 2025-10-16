@@ -21,7 +21,6 @@ await connectDB();
 const corsOptions = {
   origin: AppConstants.frontendUrl,
   credentials: true,
-  origin: process.env.ALLOWED_ORIGIN,
 };
 
 app.use(cookieParser());

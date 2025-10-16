@@ -1,5 +1,5 @@
 export class AppConstants {
-  static frontendUrl = "http://localhost:3000";
+  static frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
   static backendUrl = process.env.BACKEND_URL || "http://localhost:3001";
 
   // Check if we're in production (HTTPS)
