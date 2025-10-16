@@ -16,14 +16,15 @@ const httpServer = http.createServer(app);
 const io = initializeSocket(httpServer);
 
 // Connection to the db
-await connectDB() ;
+await connectDB();
 
 const corsOptions = {
   origin: AppConstants.frontendUrl,
   credentials: true,
+  origin: process.env.ALLOWED_ORIGIN,
 };
 
-app.use(cookieParser())
+app.use(cookieParser());
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
