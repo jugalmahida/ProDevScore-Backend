@@ -1,23 +1,25 @@
-export class AppConstants {
-  static frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-  static backendUrl = process.env.BACKEND_URL || "http://localhost:3001";
+export const AppConstants = {
+  frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
 
-  // Check if we're in production (HTTPS)
-  static isProduction = process.env.NODE_ENV === "production";
-
-  static accessTokenOptions = {
+  accessTokenOptions: {
     httpOnly: true,
-    secure: this.isProduction, // Only secure in production
-    sameSite: this.isProduction ? "none" : "lax", // 'none' for cross-site in prod
-    maxAge: 30 * 60 * 1000, // 30 minutes
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    maxAge: 15 * 60 * 1000,
     path: "/",
-  };
+    ...(process.env.NODE_ENV === "production" && {
+      domain: ".jugalmahida.com",
+    }),
+  },
 
-  static refreshTokenOptions = {
+  refreshTokenOptions: {
     httpOnly: true,
-    secure: this.isProduction, // Only secure in production
-    sameSite: this.isProduction ? "none" : "lax",
-    maxAge: 3 * 24 * 60 * 60 * 1000, // 3 days
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
-  };
-}
+    ...(process.env.NODE_ENV === "production" && {
+      domain: ".jugalmahida.com",
+    }),
+  },
+};
