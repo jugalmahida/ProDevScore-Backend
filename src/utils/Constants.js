@@ -1,3 +1,9 @@
+import crypto from "crypto";
+
+// maxAge: 3 * 60 * 60 * 1000 <= 3 hours
+// maxAge: 10 * 60 * 1000, <= 10 minutes
+// maxAge: 3 * 24 * 60 * 60 * 1000, <= 3 days
+
 export const AppConstants = {
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
 
@@ -21,5 +27,9 @@ export const AppConstants = {
     ...(process.env.NODE_ENV === "production" && {
       domain: ".jugalmahida.com",
     }),
+  },
+
+  getVerificationCode: () => {
+    return crypto.randomInt(1000, 9999);
   },
 };

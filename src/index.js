@@ -2,12 +2,12 @@ import "dotenv/config";
 import express from "express";
 import http from "http";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import { setupRoutes } from "./config/routes.config.js";
 import { setupErrorHandling } from "./config/errors.config.js";
 import { connectDB } from "./config/db.config.js";
 import { AppConstants } from "./utils/Constants.js";
 import { initializeSocket } from "./config/socket.config.js";
-import cookieParser from "cookie-parser";
 
 const app = express();
 
@@ -19,9 +19,9 @@ const io = initializeSocket(httpServer);
 await connectDB();
 
 const corsOptions = {
-  origin: [AppConstants.frontendUrl, "http://localhost:3000"],
+  origin: AppConstants.frontendUrl,
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
   exposedHeaders: ["Set-Cookie"],
 };

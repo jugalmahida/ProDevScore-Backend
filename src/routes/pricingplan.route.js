@@ -6,20 +6,19 @@ import {
   getPricingPlanById,
   updatePricingPlan,
 } from "../controllers/pricingplan.controller.js";
+
 import { authMiddleware, isAdmin } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
 router.get("/", getAllPricingPlans);
 
-// router.use(authMiddleware, isAdmin);
+router.post("/", authMiddleware, isAdmin, createPricingPlan);
 
-router.post("/", createPricingPlan);
+router.get("/:id", authMiddleware, isAdmin, getPricingPlanById);
 
-router.get("/:id", getPricingPlanById);
+router.put("/:id", authMiddleware, isAdmin, updatePricingPlan);
 
-router.put("/:id", updatePricingPlan);
-
-router.delete("/:id", deletePricingPlan);
+router.delete("/:id", authMiddleware, isAdmin, deletePricingPlan);
 
 export default router;

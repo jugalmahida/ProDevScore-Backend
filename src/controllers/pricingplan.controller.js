@@ -34,7 +34,7 @@ export const createPricingPlan = asyncHandler(async (req, res, next) => {
 
 // Get all Pricing Plans
 export const getAllPricingPlans = asyncHandler(async (req, res, next) => {
-  const plans = await PricingPlan.find();
+  const plans = await PricingPlan.find({}, { __v: 0 });
   AppSuccess.ok(plans).send(res);
 });
 

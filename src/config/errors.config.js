@@ -1,4 +1,6 @@
 // config/errorHandling.js - Error handling configuration
+import { AppError } from "../utils/AppError.js";
+
 export const setupErrorHandling = (app) => {
   // 404 handler for undefined routes
   app.use((req, res, next) => {
@@ -22,7 +24,14 @@ export const setupErrorHandling = (app) => {
 
     const isDevelopment = process.env.NODE_ENV === "development";
 
-    res.status(err.status || 500).json({
+    // Check for AppError instance first (uses statusCode)
+    if (err instanceof AppError) {
+      return err.send(res);
+    }
+
+    // Fallback for other errors
+    const statusCode = err.statusCode || err.status || 500;
+    res.status(statusCode).json({
       success: false,
       message: isDevelopment ? err.message : "Internal server error",
       ...(isDevelopment && { stack: err.stack }),

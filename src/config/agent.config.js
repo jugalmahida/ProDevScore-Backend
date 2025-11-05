@@ -5,7 +5,7 @@ const client = new OpenAI({
   apiKey: process.env.PERPLEXITY_API_KEY,
 });
 
-export const reviewCodeandGetSummary = async (code) => {
+export const reviewCodeAndGetSummary = async (code) => {
   try {
     let chatCompletion;
 
@@ -15,14 +15,12 @@ export const reviewCodeandGetSummary = async (code) => {
         {
           role: "user",
           content: `You are an expert software engineer and code reviewer. Carefully examine the following code diff which represents changes in a codebase.
-
 Analyze the following aspects:
 - Correctness (identify bugs or issues)
 - Code style and formatting consistency
 - Readability and clarity of the code
 - Potential performance or security issues
 - Best practices and maintainability
-
 Provide an overall score out of 100 based on the code quality and significance of improvements or issues found. Be objective, balanced, and constructive when giving the score as this really matters for contributors.
 Code Diff:
 ${code}`,

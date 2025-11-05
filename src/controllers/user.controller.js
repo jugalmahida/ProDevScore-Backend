@@ -5,7 +5,90 @@ import { AppError } from "../utils/AppError.js";
 import { asyncHandler } from "../utils/AsyncHandler.js";
 import { AppSuccess } from "../utils/AppSuccess.js";
 import { AppConstants } from "../utils/Constants.js";
+import { sendEmail } from "../config/email.config.js";
+import { verificationCodeHtmlTemplate } from "../utils/EmailFormats/VerificationCode.js";
+import { forgetPasswordHtmlTemplate } from "../utils/EmailFormats/ForgetPasswordVerify.js";
+import { passwordResetSuccessHtmlTemplate } from "../utils/EmailFormats/ForgetPasswordResetDone.js";
+
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
+
+const checkSPUser = (email) => {
+  return process.env.SP_USER === email;
+};
+
+const generateAndSendForgetPasswordToken = async (user) => {
+  const randomData = crypto.randomBytes(16);
+  const hexToken = randomData.toString("hex");
+  const hashed = crypto.createHash("sha256").update(hexToken).digest("hex");
+
+  user.forgetPasswordToken = hashed;
+  user.forgetPasswordTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 Minute expiration
+  await user.save({ validateBeforeSave: false });
+
+  const link = `${
+    process.env.NODE_ENV === "development"
+      ? process.env.LOCAL_FRONTEND_URL
+      : process.env.FRONTEND_URL
+  }/verify-email/${hexToken}`;
+
+  const verificationHtml = forgetPasswordHtmlTemplate(link);
+
+  const sendEmailData = await sendEmail(
+    user.email,
+    "Email verification for password reset",
+    verificationHtml
+  );
+
+  if (!sendEmailData) {
+    return false;
+  }
+  return true;
+};
+
+const generateAndSendCode = async (user) => {
+  // Generate & Send Verification Code
+  const verificationCode = AppConstants.getVerificationCode();
+  user.verificationCode = verificationCode;
+  user.expiresCodeAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiration
+  user.save({ validateBeforeSave: false });
+  const htmlContent = verificationCodeHtmlTemplate(verificationCode);
+
+  const sendEmailData = await sendEmail(
+    user.email,
+    "ProDevScore Verification Code",
+    htmlContent
+  );
+
+  if (!sendEmailData) {
+    return false;
+  }
+
+  return true;
+};
+
+const verifyCode = async (user, code, next) => {
+  if (!user || !code || !next) return;
+
+  if (!user.verificationCode) {
+    return next(AppError.badRequest("Code not found for this user"));
+  }
+
+  if (user.expiresCodeAt < new Date()) {
+    return next(AppError.badRequest("Verification Code is expired"));
+  }
+
+  if (Number.parseInt(code) !== user.verificationCode) {
+    return next(AppError.badRequest("Verification Code is invalid"));
+  }
+
+  user.verificationCode = undefined;
+  user.expiresCodeAt = undefined;
+
+  await user.save({ validateBeforeSave: false });
+
+  return true;
+};
 
 const generateTokens = async (user) => {
   if (!user) return;
@@ -66,7 +149,7 @@ export const registerUser = asyncHandler(async (req, res, next) => {
   oneMonthLater.setMonth(now.getMonth() + 1);
 
   await UserSubscriptions.create({
-    userId: newUser._id,
+    userId: checkNewUser._id,
     currentPlan: freePlan._id,
     currentUsage: {
       repositories: 0,
@@ -78,21 +161,51 @@ export const registerUser = asyncHandler(async (req, res, next) => {
     renewalDate: oneMonthLater,
   });
 
-  const { accessToken, refreshToken } = await generateTokens(checkNewUser);
+  const success = await generateAndSendCode(checkNewUser);
 
-  // maxAge: 3 * 60 * 60 * 1000 <= 3 hours
-  // maxAge: 10 * 60 * 1000, <= 10 minutes
-  // maxAge: 3 * 24 * 60 * 60 * 1000, <= 3 days
+  if (!success) {
+    return next(
+      AppError.badRequest("Error in sending or saving verification code")
+    );
+  }
+  AppSuccess.ok("User Registered & Verification Code Send to Email").send(res);
+});
 
+export const verifyCodeAndSetTokens = asyncHandler(async (req, res, next) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return next(AppError.badRequest("Fields are missing"));
+  }
+
+  const user = await User.findOne({ email: email });
+
+  if (!user) {
+    return next(AppError.badRequest("Invalid User"));
+  }
+
+  const success = await verifyCode(user, code, next);
+
+  if (!success) {
+    return next(AppError.internalError("Error while verify code"));
+  }
+
+  user.isVerified = 1;
+  await user.save({ validateBeforeSave: false });
+
+  const { accessToken, refreshToken } = await generateTokens(user);
   res
     .cookie("accessToken", accessToken, AppConstants.accessTokenOptions)
     .cookie("refreshToken", refreshToken, AppConstants.refreshTokenOptions);
 
-  checkNewUser.__v = undefined;
-  checkNewUser.refreshToken = undefined;
+  user.__v = undefined;
+  user.refreshToken = undefined;
+  user.expiresCodeAt = undefined;
+  user.verificationCode = undefined;
+  user.password = undefined;
 
   const userWithTokens = {
-    user: checkNewUser,
+    user: user,
     tokens: {
       accessToken: accessToken,
       refreshToken: refreshToken,
@@ -101,6 +214,93 @@ export const registerUser = asyncHandler(async (req, res, next) => {
 
   AppSuccess.ok(userWithTokens).send(res);
 });
+
+export const getCurrentUser = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select(
+    "-password -refreshToken -expireCodeAt -verificationCode"
+  );
+
+  if (!user) {
+    return next(AppError.badRequest("Invalid User."));
+  }
+
+  AppSuccess.ok(user).send(res);
+});
+
+export const forgetPassword = asyncHandler(async (req, res, next) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return next(AppError.badRequest("Email is required"));
+  }
+
+  const isSuperUser = checkSPUser(email);
+
+  if (isSuperUser) {
+    return next(AppError.unauthorized("Forget Password not allowed"));
+  }
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return next(AppError.badRequest("Invalid Email"));
+  }
+
+  const success = await generateAndSendForgetPasswordToken(user);
+
+  if (!success) {
+    return next(
+      AppError.badRequest("Error in sending or saving verification token")
+    );
+  }
+  AppSuccess.ok("Verification mail send to email").send(res);
+});
+
+export const verifyForgetPasswordTokenAndResetPassword = asyncHandler(
+  async (req, res, next) => {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return next(AppError.badRequest("Token and new password are required"));
+    }
+
+    const hashed = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      forgetPasswordToken: hashed,
+      forgetPasswordTokenExpiry: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return next(AppError.badRequest("Invalid or expired token"));
+    }
+
+    // Clear token fields before saving new password
+    user.forgetPasswordToken = undefined;
+    user.forgetPasswordTokenExpiry = undefined;
+    user.password = newPassword;
+
+    // Use validateBeforeSave: true to ensure password validation
+    await user.save({ validateBeforeSave: true });
+
+    const forgetPasswordDoneHtml = passwordResetSuccessHtmlTemplate(user.email);
+
+    const sendEmailData = await sendEmail(
+      user.email,
+      "Password reset successfully",
+      forgetPasswordDoneHtml
+    );
+
+    if (!sendEmailData) {
+      return next(
+        AppError.internalError("Error in sending success forget password email")
+      );
+    }
+
+    AppSuccess.ok("Password reset successfully").send(res);
+  }
+);
 
 export const registerAdmin = asyncHandler(async (req, res, next) => {
   const { fullName, email, password } = req.body;
@@ -119,6 +319,7 @@ export const registerAdmin = asyncHandler(async (req, res, next) => {
     email: email,
     password: password,
     role: "admin",
+    isVerified: 1,
   });
 
   const proPlan = await PricingPlan.findOne({ tier: "pro" });
@@ -190,11 +391,46 @@ export const loginUser = asyncHandler(async (req, res, next) => {
   AppSuccess.ok(userWithTokens).send(res);
 });
 
-export const PasswordResetUser = asyncHandler(async (req, res, next) => {});
+export const changeUserPassword = asyncHandler(async (req, res, next) => {
+  const { oldPassword, newPassword } = req.body;
+
+  if (!oldPassword || !newPassword) {
+    return next(AppError.badRequest("Fields are Missing"));
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(AppError.badRequest("Invalid User"));
+  }
+
+  const isSuperUser = checkSPUser(user?.email);
+
+  if (isSuperUser) {
+    return next(AppError.badRequest("Change Password not allowed"));
+  }
+
+  const passwordCorrect = user.isCorrectPassword(oldPassword);
+
+  if (!passwordCorrect) {
+    return next(AppError.unauthorized("Incorrect user password"));
+  }
+
+  user.password = newPassword;
+  const upUser = await user.save({ validateBeforeSave: false }, { new: true });
+
+  if (!upUser) {
+    return next(AppError.internalError("Error in updating password"));
+  }
+
+  upUser.password = null;
+  upUser.refreshToken = null;
+  upUser.role = null;
+
+  AppSuccess.ok("Password Updated successfully").send(res);
+});
 
 export const logoutUser = asyncHandler(async (req, res, next) => {
-  console.log(req.user);
-
   await User.findByIdAndUpdate(
     req.user._id,
     {
@@ -243,10 +479,50 @@ export const refreshTokens = asyncHandler(async (req, res, next) => {
     AppSuccess.ok(dataToSend).send(res);
   } catch (error) {
     console.error("Error in refreshing token ", error);
+    if (error.name === "TokenExpiredError") {
+      return next(AppError.unauthorized("Token expired."));
+    }
+    if (error.name === "JsonWebTokenError") {
+      return next(AppError.unauthorized("Invalid token."));
+    }
     return next(AppError.internalError("Server error during refreshing token"));
   }
 });
 
+export const deleteUser = asyncHandler(async (req, res, next) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return next(AppError.badRequest("Id is Invalid or Missing"));
+  }
+
+  const user = await User.findOne({ _id: id });
+
+  const isSuperUser = checkSPUser(user?.email);
+
+  if (isSuperUser) {
+    return next(AppError.badRequest("DELETE not allowed"));
+  }
+
+  const deletedFromUserCollection = await User.findByIdAndDelete(id);
+  const deletedFromUserSubscriptionsCollection =
+    await UserSubscriptions.findOneAndDelete({ userId: id });
+
+  if (!deletedFromUserCollection || !deletedFromUserSubscriptionsCollection) {
+    return next(AppError.badRequest("Invalid User"));
+  }
+
+  AppSuccess.ok("User Deleted successfully").send(res);
+});
+
 export const updateUser = asyncHandler(async (req, res, next) => {});
 
-export const getAllUsers = asyncHandler(async (req, res, next) => {});
+export const getAllUsers = asyncHandler(async (req, res, next) => {
+  const users = await User.find({}, { password: 0, __v: 0 });
+
+  if (!users) {
+    return next(AppError.notFound("User list is empty"));
+  }
+
+  AppSuccess.ok(users).send(res);
+});

@@ -2,22 +2,38 @@ import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-const userSchema = new mongoose.Schema({
-  fullName: { type: String, require: true },
-  email: { type: String, require: true, unique: true },
-  password: { type: String, required: true },
-  role: {
-    type: String,
-    enum: ["admin", "user"],
-    default: "user",
+const userSchema = new mongoose.Schema(
+  {
+    fullName: { type: String, require: true },
+    email: { type: String, require: true, unique: true },
+    password: { type: String, required: true },
+    role: {
+      type: String,
+      enum: ["admin", "user"],
+      default: "user",
+    },
+    refreshToken: {
+      type: String,
+    },
+    isVerified: {
+      type: Number,
+      default: 0,
+    },
+    verificationCode: { type: Number },
+    expiresCodeAt: { type: Date },
+    forgetPasswordToken: {
+      type: String,
+    },
+    forgetPasswordTokenExpiry: {
+      type: String,
+    },
   },
-  refreshToken: {
-    type: String,
-  },
-  verificationCode: { type: Number },
-  expiresAt: { type: Date },
-});
+  {
+    timestamps: true,
+  }
+);
 
+// Hooks
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 12);
