@@ -39,7 +39,7 @@ router.post("/refresh-tokens", refreshTokens);
 
 router.post("/forget-password", forgetPassword);
 
-router.get("/verifyToken/:token", verifyForgetPasswordTokenAndResetPassword);
+router.post("/verifyToken/:token", verifyForgetPasswordTokenAndResetPassword);
 
 // Authorization Routes
 
@@ -49,13 +49,6 @@ router.put("/profile/:id", authMiddleware, isAdminOrUser, updateUser);
 
 router.patch(
   "/change-password",
-  authMiddleware,
-  isAdminOrUser,
-  changeUserPassword
-);
-
-router.put(
-  "/updatePassword",
   authMiddleware,
   isAdminOrUser,
   changeUserPassword
