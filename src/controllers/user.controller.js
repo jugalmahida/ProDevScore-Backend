@@ -217,7 +217,7 @@ export const verifyCodeAndSetTokens = asyncHandler(async (req, res, next) => {
 
 export const getCurrentUser = asyncHandler(async (req, res, next) => {
   const user = await User.findById(req.user._id).select(
-    "-password -refreshToken -expireCodeAt -verificationCode"
+    "-password -refreshToken -expireCodeAt  -verificationCode -createdAt -updatedAt -__v"
   );
 
   if (!user) {

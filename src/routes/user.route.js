@@ -12,6 +12,7 @@ import {
   deleteUser,
   verifyForgetPasswordTokenAndResetPassword,
   forgetPassword,
+  getCurrentUser,
 } from "../controllers/user.controller.js";
 
 import {
@@ -44,6 +45,8 @@ router.post("/verifyToken/:token", verifyForgetPasswordTokenAndResetPassword);
 // Authorization Routes
 
 // router.use(authMiddleware); <- remove and apply in each route because is going to apply all route even in verifyToken/:token since its above the this line
+
+router.get("/me", authMiddleware, isAdminOrUser, getCurrentUser);
 
 router.put("/profile/:id", authMiddleware, isAdminOrUser, updateUser);
 
