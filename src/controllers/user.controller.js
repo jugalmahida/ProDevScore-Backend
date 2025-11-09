@@ -117,7 +117,7 @@ export const registerUser = asyncHandler(async (req, res, next) => {
 
   const exitingUser = await User.findOne({ email: email });
   if (exitingUser) {
-    next(AppError.conflict("User already exists"));
+    return next(AppError.conflict("User already exists"));
   }
 
   const newUser = await User.create({
@@ -473,8 +473,10 @@ export const refreshTokens = asyncHandler(async (req, res, next) => {
 
     const dataToSend = {
       userEmail: user.email,
-      accessToken: accessToken,
-      refreshToken: refreshToken,
+      tokens: {
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      },
     };
     AppSuccess.ok(dataToSend).send(res);
   } catch (error) {
