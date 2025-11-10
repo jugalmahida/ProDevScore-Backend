@@ -30,7 +30,7 @@ const generateAndSendForgetPasswordToken = async (user) => {
     process.env.NODE_ENV === "development"
       ? process.env.LOCAL_FRONTEND_URL
       : process.env.FRONTEND_URL
-  }/verify-email/${hexToken}`;
+  }/reset-password/${hexToken}`;
 
   const verificationHtml = forgetPasswordHtmlTemplate(link);
 
