@@ -216,15 +216,41 @@ export const verifyCodeAndSetTokens = asyncHandler(async (req, res, next) => {
 });
 
 export const getCurrentUser = asyncHandler(async (req, res, next) => {
-  const user = await User.findById(req.user._id).select(
-    "-password -refreshToken -expireCodeAt  -verificationCode -createdAt -updatedAt -__v"
-  );
+  const userId = req.user._id;
+
+  if (!userId) {
+    return next(AppError.badRequest("Invalid User."));
+  }
+  // Reusable projections (exclude sensitive/system fields)
+  const userProjection =
+    "-password -refreshToken -verificationCode -expireCodeAt -createdAt -updatedAt -__v";
+  const subsProjection = "-__v -createdAt -updatedAt -_id";
+
+  // Run independent queries in parallel
+  const [user, userSubscriptions] = await Promise.all([
+    User.findById(userId).select(userProjection).lean(),
+    UserSubscriptions.findOne({ userId })
+      .select("-userId -__v -createdAt -updatedAt")
+      .populate({
+        path: "currentPlan",
+        // Keep only allowed fields and explicitly drop _id in the populated doc
+        select: "name price tier limits -_id",
+      }),
+  ]);
 
   if (!user) {
     return next(AppError.badRequest("Invalid User."));
   }
 
-  AppSuccess.ok(user).send(res);
+  if (!userSubscriptions) {
+    return next(AppError.notFound("User subscriptions not found"));
+  }
+
+  // Single, well-shaped payload
+  AppSuccess.ok({
+    personalDetails: user,
+    subscriptionsDetails: userSubscriptions,
+  }).send(res);
 });
 
 export const forgetPassword = asyncHandler(async (req, res, next) => {

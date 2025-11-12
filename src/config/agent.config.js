@@ -26,7 +26,7 @@ const CodeReviewEvent = z.object({
   summary: z
     .string()
     .describe(
-      "Overall summary of the code review highlighting key points and observations. in max 2 lines."
+      "Overall summary of the code review highlighting key points and observations. Max 2 lines."
     ),
   overall_score: z
     .number()

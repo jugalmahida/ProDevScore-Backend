@@ -35,7 +35,12 @@ const pricingPlanSchema = new mongoose.Schema(
       },
     },
   },
-  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
+  {
+    timestamps: true,
+    id: false,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
 
 // count total commit limit in a particular plan 
