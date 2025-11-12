@@ -185,8 +185,8 @@ export const generateAnalysisScore = asyncHandler(async (req, res, next) => {
         headers: { Accept: "application/vnd.github.v3.diff" },
       });
 
-      const reviewJsonStr = await reviewCodeAndGetSummary(codeResp.data);
-      const reviewJson = JSON.parse(reviewJsonStr);
+      const reviewJson = await reviewCodeAndGetSummary(codeResp.data);
+      // const reviewJson = JSON.parse(reviewJson);
 
       const reviewResult = {
         sha: commit.sha,
