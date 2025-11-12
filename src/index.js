@@ -6,11 +6,12 @@ import { setupRoutes } from "./config/routes.config.js";
 import { setupErrorHandling } from "./config/errors.config.js";
 import { connectDB } from "./config/db.config.js";
 import { AppConstants } from "./utils/Constants.js";
+import { initializeSocket } from "./config/socket.config.js";
 
 const app = express();
 
 const httpServer = http.createServer(app);
-
+initializeSocket(httpServer);
 // Connection to the db
 await connectDB();
 
