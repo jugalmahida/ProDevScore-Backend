@@ -210,7 +210,7 @@ export const generateAnalysisScore = asyncHandler(async (req, res, next) => {
     } catch (error) {
       const errorResult = {
         sha: commit.sha,
-        review: `Error: Failed to parse AI response - ${error.message}`,
+        review: `Error: Failed to parse AI response`,
         score: null,
       };
 
