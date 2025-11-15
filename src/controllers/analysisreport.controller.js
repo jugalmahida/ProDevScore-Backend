@@ -1,5 +1,5 @@
 import { apiClient } from "../config/axios.config.js";
-import { reviewCodeAndGetSummary } from "../config/agent.config.js";
+import { reviewCodeAndGetSummary } from "../agent/agent.config.js";
 import { getIO } from "../config/socket.config.js";
 import { AppError } from "../utils/AppError.js";
 import { AppSuccess } from "../utils/AppSuccess.js";
@@ -59,7 +59,6 @@ export const generateAnalysisScore = asyncHandler(async (req, res, next) => {
   const alreadyUsed =
     Array.isArray(userSubscription.currentUsage.usedContributors) &&
     userSubscription.currentUsage.usedContributors.includes(contributorKey);
-  
 
   if (
     !alreadyUsed &&

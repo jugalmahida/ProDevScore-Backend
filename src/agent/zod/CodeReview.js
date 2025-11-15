@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const model = "sonar";
+
 // For structured output
 export const CodeReviewEvent = z.object({
   summary: z

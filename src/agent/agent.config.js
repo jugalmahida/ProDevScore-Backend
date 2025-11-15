@@ -13,7 +13,7 @@ import {
   CodeReviewEvent,
   InputGuardrailEvent,
   OutputGuardrailEvent,
-} from "../zod/CodeReview.js";
+} from "../agent/zod/CodeReview.js";
 
 // Client for communicating with Perplexity AI
 const perplexityClient = new OpenAI({
