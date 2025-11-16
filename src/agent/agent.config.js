@@ -61,7 +61,7 @@ const codeReviewOutputGuardrailAgent = new Agent({
   instructions: `
     Validate that the output strictly matches:
     {
-      summary: string (max 2 lines, based only on the provided diff),
+      summary: string (concise, based primarily on the provided diff),
       overall_score: number 0-100
     }
     Rules:
