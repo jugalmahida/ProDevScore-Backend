@@ -1,0 +1,15 @@
+name: Keep Render Service Alive
+
+on:
+  schedule:
+    # Runs every 14 minutes
+    - cron: "*/14 * * * *"
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          curl -f https://api.prodevscore.jugalmahida.com/api/v1/health || exit 0
