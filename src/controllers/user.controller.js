@@ -396,6 +396,23 @@ export const loginUser = asyncHandler(async (req, res, next) => {
     return next(AppError.unauthorized("Incorrect Password"));
   }
 
+  if (user.isVerified === 0) {
+    const success = await generateAndSendCode(user);
+
+    if (!success) {
+      return next(
+        AppError.badRequest("Error in sending or saving verification code")
+      );
+    }
+
+    return next(
+      AppError.unauthorized(
+        "Unverified account identified, Verification code is sent to email",
+        "USER_UNVERIFIED"
+      )
+    );
+  }
+
   const { accessToken, refreshToken } = await generateTokens(user);
 
   res
