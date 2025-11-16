@@ -46,7 +46,13 @@ const generateAndSendForgetPasswordToken = async (user) => {
   return true;
 };
 
-const generateAndSendCode = async (user) => {
+const generateAndSendCode = async (user, next) => {
+  if (user.verificationCode && !(user.expiresCodeAt < new Date())) {
+    return next(
+      AppError.badRequest("Verification code is already send to email")
+    );
+  }
+
   // Generate & Send Verification Code
   const verificationCode = AppConstants.getVerificationCode();
   user.verificationCode = verificationCode;
@@ -161,7 +167,7 @@ export const registerUser = asyncHandler(async (req, res, next) => {
     renewalDate: oneMonthLater,
   });
 
-  const success = await generateAndSendCode(checkNewUser);
+  const success = await generateAndSendCode(checkNewUser, next);
 
   if (!success) {
     return next(
@@ -397,7 +403,7 @@ export const loginUser = asyncHandler(async (req, res, next) => {
   }
 
   if (user.isVerified === 0) {
-    const success = await generateAndSendCode(user);
+    const success = await generateAndSendCode(user, next);
 
     if (!success) {
       return next(
