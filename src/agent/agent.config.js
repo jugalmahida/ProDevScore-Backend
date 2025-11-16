@@ -65,7 +65,7 @@ const codeReviewOutputGuardrailAgent = new Agent({
       overall_score: number 0-100
     }
     Rules:
-    - Summary must reflect only the diff (no hallucinated code or context).
+    - Summary should be brief and mainly reflect the diff.
     - No extra fields, no markdown, no explanations.
     - overall_score must be numeric and within range.
     - Flag output as invalid if any rule is violated.
