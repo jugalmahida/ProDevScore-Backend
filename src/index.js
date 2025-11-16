@@ -11,7 +11,7 @@ import { initializeSocket } from "./config/socket.config.js";
 const app = express();
 
 const httpServer = http.createServer(app);
-initializeSocket(httpServer);
+const io = initializeSocket(httpServer);
 // Connection to the db
 await connectDB();
 
@@ -26,6 +26,18 @@ app.use(cookieParser());
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Health check endpoints (must be before error handling)
+app.get(`/api/${process.env.VERSION}/health`, (req, res) => {
+  res.json({
+    status: "OK",
+    environment: process.env.NODE_ENV,
+    uptime: process.uptime(),
+    version: process.env.VERSION,
+    socketConnections: io.engine.clientsCount,
+    timestamp: new Date().toISOString(),
+  });
+});
 
 setupRoutes(app);
 setupErrorHandling(app);
