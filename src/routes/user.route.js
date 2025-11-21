@@ -13,6 +13,8 @@ import {
   verifyForgetPasswordTokenAndResetPassword,
   forgetPassword,
   getCurrentUser,
+  loginWithGithub,
+  loginWithGithubCallBack,
 } from "../controllers/user.controller.js";
 
 import {
@@ -33,6 +35,10 @@ const router = Router();
 router.post("/register", registerUser);
 
 router.post("/verifyCode", verifyCodeAndSetTokens);
+
+router.get("/github", loginWithGithub);
+
+router.post("/github/callback", loginWithGithubCallBack);
 
 router.post("/login", loginUser);
 

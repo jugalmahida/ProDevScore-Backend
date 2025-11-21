@@ -29,6 +29,18 @@ export const AppConstants = {
     }),
   },
 
+  // NEW: Options for the temporary OAuth State cookie
+  githubAuthStateOptions: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    maxAge: 10 * 60 * 1000, // 10 minutes is enough for a login attempt
+    path: "/",
+    ...(process.env.NODE_ENV === "production" && {
+      domain: ".jugalmahida.com",
+    }),
+  },
+
   getVerificationCode: () => {
     return crypto.randomInt(1000, 9999);
   },

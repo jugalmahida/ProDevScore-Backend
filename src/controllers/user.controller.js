@@ -9,9 +9,11 @@ import { sendEmail } from "../config/email.config.js";
 import { verificationCodeHtmlTemplate } from "../utils/EmailFormats/VerificationCode.js";
 import { forgetPasswordHtmlTemplate } from "../utils/EmailFormats/ForgetPasswordVerify.js";
 import { passwordResetSuccessHtmlTemplate } from "../utils/EmailFormats/ForgetPasswordResetDone.js";
+import { decodeIdToken, generateCodeVerifier, generateState } from "arctic";
 
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { github } from "../config/oauth.config.js";
 
 const checkSPUser = (email) => {
   return process.env.SP_USER === email;
@@ -113,6 +115,27 @@ const generateTokens = async (user) => {
     return;
   }
 };
+
+export const loginWithGithub = asyncHandler(async (req, res, next) => {
+  const state = generateState();
+  const url = github.createAuthorizationURL(state, [
+    "user:email",
+    "read:user",
+    "repo",
+  ]);
+
+  res.cookie("github_oauth_state", state, AppConstants.githubAuthStateOptions);
+
+  const dataToSend = {
+    url: url.toString(),
+    state: state,
+  };
+  AppSuccess.ok(dataToSend).send(res);
+});
+
+export const loginWithGithubCallBack = asyncHandler(
+  async (req, res, next) => {}
+);
 
 export const registerUser = asyncHandler(async (req, res, next) => {
   const { fullName, email, password } = req.body;

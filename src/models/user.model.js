@@ -27,6 +27,7 @@ const userSchema = new mongoose.Schema(
     forgetPasswordTokenExpiry: {
       type: String,
     },
+    privateRepos: { type: [String] },
   },
   {
     timestamps: true,
