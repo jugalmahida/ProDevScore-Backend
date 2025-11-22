@@ -38,7 +38,7 @@ router.post("/verifyCode", verifyCodeAndSetTokens);
 
 router.get("/github", loginWithGithub);
 
-router.post("/github/callback", loginWithGithubCallBack);
+router.get("/github/callback", loginWithGithubCallBack);
 
 router.post("/login", loginUser);
 

@@ -6,7 +6,12 @@ const userSchema = new mongoose.Schema(
   {
     fullName: { type: String, require: true },
     email: { type: String, require: true, unique: true },
-    password: { type: String, required: true },
+    password: {
+      type: String,
+      required: function () {
+        return this.authProvider === "Email";
+      },
+    },
     role: {
       type: String,
       enum: ["admin", "user"],
@@ -27,7 +32,17 @@ const userSchema = new mongoose.Schema(
     forgetPasswordTokenExpiry: {
       type: String,
     },
-    privateRepos: { type: [String] },
+    githubId: {
+      type: String,
+      sparse: true,
+      unique: true,
+    },
+    privateRepos: { type: [String], default: [] },
+    authProvider: {
+      type: String,
+      enum: ["Email", "Github"],
+      default: "Email",
+    },
   },
   {
     timestamps: true,
@@ -36,7 +51,7 @@ const userSchema = new mongoose.Schema(
 
 // Hooks
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+  if (!this.isModified("password") || !this.password) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });

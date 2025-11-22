@@ -9,11 +9,11 @@ import { sendEmail } from "../config/email.config.js";
 import { verificationCodeHtmlTemplate } from "../utils/EmailFormats/VerificationCode.js";
 import { forgetPasswordHtmlTemplate } from "../utils/EmailFormats/ForgetPasswordVerify.js";
 import { passwordResetSuccessHtmlTemplate } from "../utils/EmailFormats/ForgetPasswordResetDone.js";
-import { decodeIdToken, generateCodeVerifier, generateState } from "arctic";
-
+import { generateState } from "arctic";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { github } from "../config/oauth.config.js";
+import { Octokit } from "octokit";
 
 const checkSPUser = (email) => {
   return process.env.SP_USER === email;
@@ -133,9 +133,152 @@ export const loginWithGithub = asyncHandler(async (req, res, next) => {
   AppSuccess.ok(dataToSend).send(res);
 });
 
-export const loginWithGithubCallBack = asyncHandler(
-  async (req, res, next) => {}
-);
+export const loginWithGithubCallBack = asyncHandler(async (req, res, next) => {
+  const code = req.query.code?.toString() ?? null;
+  const state = req.query.state?.toString() ?? null;
+  const storedState = req.cookies.github_oauth_state ?? null;
+
+  // 1. Security Validation
+  if (!code || !state || !storedState || state !== storedState) {
+    return next(AppError.badRequest("Invalid OAuth state or code"));
+  }
+
+  try {
+    // 2. Exchange Code for Access Token
+    const tokens = await github.validateAuthorizationCode(code);
+    const githubAccessToken = tokens.accessToken();
+
+    // 3. Initialize Octokit to fetch user data
+    const octokit = new Octokit({ auth: githubAccessToken });
+
+    // 4. Fetch GitHub User Profile
+    const { data: githubUser } = await octokit.rest.users.getAuthenticated();
+
+    // 5. Handle Email
+    let email = githubUser.email;
+    if (!email) {
+      const { data: emails } =
+        await octokit.rest.users.listEmailsForAuthenticatedUser();
+      const primaryEmail = emails.find((e) => e.primary && e.verified);
+      email = primaryEmail ? primaryEmail.email : null;
+    }
+
+    if (!email) {
+      return next(
+        AppError.badRequest("No verified email found on GitHub account")
+      );
+    }
+
+    // 6. Find or Create User
+    let user = await User.findOne({ githubId: githubUser.id });
+    let isNewUser = false;
+
+    if (!user) {
+      // Check if email exists (user registered with email before)
+      user = await User.findOne({ email: email });
+
+      if (user) {
+        // Link existing email account to GitHub
+        user.githubId = githubUser.id;
+        user.authProvider = "Github";
+        user.isVerified = 1;
+        await user.save({ validateBeforeSave: false });
+      } else {
+        // Create new user
+        isNewUser = true;
+        user = await User.create({
+          fullName: githubUser.name || githubUser.login,
+          email: email,
+          githubId: githubUser.id,
+          authProvider: "Github",
+          isVerified: 1,
+        });
+
+        // Initialize Free Subscription
+        const freePlan = await PricingPlan.findOne({ tier: "free" });
+        if (freePlan) {
+          const now = new Date();
+          const oneMonthLater = new Date(now);
+          oneMonthLater.setMonth(now.getMonth() + 1);
+
+          await UserSubscriptions.create({
+            userId: user._id,
+            currentPlan: freePlan._id,
+            currentUsage: {
+              repositories: 0,
+              commits: 0,
+              lastResetDate: now,
+            },
+            startDate: now,
+            endDate: oneMonthLater,
+            renewalDate: oneMonthLater,
+          });
+        }
+      }
+    }
+
+    // 7. Generate Tokens & Set Cookies
+    const { accessToken, refreshToken } = await generateTokens(user);
+
+    res
+      .cookie("accessToken", accessToken, AppConstants.accessTokenOptions)
+      .cookie("refreshToken", refreshToken, AppConstants.refreshTokenOptions);
+
+    // 8. Check GitHub App Installation
+    // const { data: installations } =
+    //   await octokit.rest.apps.listInstallationsForAuthenticatedUser();
+    // const hasInstalledApp = installations.total_count > 0;
+
+    // 9. Prepare user response (same as loginUser)
+    user.password = undefined;
+    user.__v = undefined;
+    user.refreshToken = undefined;
+    user.role = undefined;
+
+    // 10. Return response based on installation status
+    // if (hasInstalledApp) {
+    //   const userWithTokens = {
+    //     user,
+    //     tokens: {
+    //       accessToken: accessToken,
+    //       refreshToken: refreshToken,
+    //     },
+    //   };
+    //   AppSuccess.ok(userWithTokens).send(res);
+    // } else {
+    //   // User needs to install GitHub App
+    //   const appSlug = process.env.GITHUB_APP_SLUG
+    //     ? process.env.GITHUB_APP_SLUG
+    //     : "prodevscore-development";
+    //   const installUrl = `https://github.com/apps/${appSlug}/installations/new`;
+
+    //   AppSuccess.ok({
+    //     user,
+    //     tokens: {
+    //       accessToken: accessToken,
+    //       refreshToken: refreshToken,
+    //     },
+    //     requiresInstallation: true,
+    //     installUrl: installUrl,
+    //   }).send(res);
+    // }
+
+    const userWithTokens = {
+      user,
+      tokens: {
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      },
+    };
+    AppSuccess.ok(userWithTokens).send(res);
+  } catch (e) {
+    if (e instanceof OAuth2RequestError) {
+      return next(AppError.badRequest("Invalid OAuth code"));
+    }
+    console.error("GitHub Login Error:", e);
+    return next(AppError.internalError("GitHub Login Failed"));
+  }
+});
 
 export const registerUser = asyncHandler(async (req, res, next) => {
   const { fullName, email, password } = req.body;
@@ -297,6 +440,13 @@ export const forgetPassword = asyncHandler(async (req, res, next) => {
 
   const user = await User.findOne({ email });
 
+  // In forgotPassword controller
+  if (user.authProvider !== "Email") {
+    return next(
+      AppError.badRequest("Password reset not available for GitHub accounts")
+    );
+  }
+
   if (!user) {
     return next(AppError.badRequest("Invalid Email"));
   }
@@ -417,6 +567,10 @@ export const loginUser = asyncHandler(async (req, res, next) => {
 
   if (!user) {
     return next(AppError.notFound("Incorrect Email"));
+  }
+
+  if (user.authProvider !== "Email") {
+    return next(AppError.badRequest("Please login with GitHub"));
   }
 
   const isCorrect = await user.isCorrectPassword(password);
