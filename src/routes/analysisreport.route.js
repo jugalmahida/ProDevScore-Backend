@@ -1,7 +1,7 @@
 import express from "express";
 import {
   generateAnalysisScore,
-  generateGridCommitsData,
+  getContributorData,
   getContributorsData,
 } from "../controllers/analysisreport.controller.js";
 
@@ -17,6 +17,6 @@ router.use(authMiddleware);
 
 router.post("/getContributors", isAdminOrUser, getContributorsData);
 router.post("/analysis", isAdminOrUser, generateAnalysisScore);
-router.post("/gridcommits", isAdminOrUser, generateGridCommitsData);
+router.get("/getContributorData", isAdminOrUser, getContributorData);
 
 export default router;

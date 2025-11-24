@@ -382,4 +382,226 @@ export const getContributorsData = asyncHandler(async (req, res, next) => {
   AppSuccess.ok(response.data).send(res);
 });
 
-export const generateGridCommitsData = async () => {};
+export const getContributorData = asyncHandler(async (req, res, next) => {
+  const { login, githubUrl } = req.body;
+
+  if (!login || !githubUrl) {
+    return next(AppError.badRequest("Github Url or username is missing"));
+  }
+
+  // Normalize to "owner/repo"
+  let repoFull, owner, repo;
+  try {
+    const u = new URL(githubUrl);
+    [owner, repo] = u.pathname.split("/").filter(Boolean);
+    if (!owner || !repo) {
+      return next(AppError.badRequest("Invalid GitHub repository URL"));
+    }
+    repoFull = `${owner.toLowerCase()}/${repo.toLowerCase()}`;
+  } catch {
+    return next(AppError.badRequest("Invalid GitHub repository URL"));
+  }
+
+  try {
+    // 1. Get basic contributor info
+    const contributorUrl = `/repos/${repoFull}/contributors`;
+    const contributorsResponse = await apiClient.get(contributorUrl);
+    const contributor = contributorsResponse.data.find(
+      (c) => c.login.toLowerCase() === login.toLowerCase()
+    );
+
+    if (!contributor) {
+      return next(
+        AppError.notFound(`Contributor ${login} not found in this repository`)
+      );
+    }
+
+    // 2. Get user profile data
+    const userUrl = `/users/${login}`;
+    const userResponse = await apiClient.get(userUrl);
+    const userData = userResponse.data;
+
+    // 3. Fetch ALL commits by this contributor with pagination
+    let allCommits = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const commitsUrl = `/repos/${repoFull}/commits`;
+      const commitsResponse = await apiClient.get(commitsUrl, {
+        params: {
+          author: login,
+          per_page: 100,
+          page: page,
+        },
+      });
+
+      const commits = commitsResponse.data;
+      allCommits = allCommits.concat(commits);
+
+      // Check if there are more pages
+      hasMore = commits.length === 100;
+      page++;
+
+      // Safety limit to prevent infinite loops
+      if (page > 50) break; // Max 5000 commits
+    }
+
+
+    // 5. Get detailed commit data for top commits
+    const commitDetails = await Promise.all(
+      allCommits.slice(0, 10).map(async (commit) => {
+        try {
+          const detailUrl = `/repos/${repoFull}/commits/${commit.sha}`;
+          const detail = await apiClient.get(detailUrl);
+          return {
+            sha: commit.sha,
+            message: commit.commit.message,
+            date: commit.commit.author.date,
+            additions: detail.data.stats.additions,
+            deletions: detail.data.stats.deletions,
+            total: detail.data.stats.total,
+            files: detail.data.files.map((f) => ({
+              filename: f.filename,
+              additions: f.additions,
+              deletions: f.deletions,
+              changes: f.changes,
+            })),
+          };
+        } catch (err) {
+          return {
+            sha: commit.sha,
+            message: commit.commit.message,
+            date: commit.commit.author.date,
+            error: "Could not fetch detailed stats",
+          };
+        }
+      })
+    );
+
+    // 6. Calculate statistics
+    const totalCommits = allCommits.length;
+    const firstCommitDate =
+      allCommits.length > 0
+        ? allCommits[allCommits.length - 1].commit.author.date
+        : null;
+    const lastCommitDate =
+      allCommits.length > 0 ? allCommits[0].commit.author.date : null;
+
+    // Calculate total lines changed (from top 10 commits)
+    const totalStats = commitDetails.reduce(
+      (acc, commit) => {
+        if (!commit.error) {
+          acc.additions += commit.additions || 0;
+          acc.deletions += commit.deletions || 0;
+          acc.total += commit.total || 0;
+        }
+        return acc;
+      },
+      { additions: 0, deletions: 0, total: 0 }
+    );
+
+    // 7. Find top commit (most changes)
+    const topCommit = commitDetails.reduce((max, commit) => {
+      if (commit.error) return max;
+      return !max || commit.total > (max.total || 0) ? commit : max;
+    }, null);
+
+    // 8. Get contribution activity (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentCommits = allCommits.filter(
+      (c) => new Date(c.commit.author.date) > thirtyDaysAgo
+    );
+
+
+    // 10. Compile response
+    const contributorData = {
+      profile: {
+        login: userData.login,
+        name: userData.name,
+        avatar_url: userData.avatar_url,
+        bio: userData.bio,
+        company: userData.company,
+        location: userData.location,
+        email: userData.email,
+        blog: userData.blog,
+        twitter_username: userData.twitter_username,
+        public_repos: userData.public_repos,
+        followers: userData.followers,
+        following: userData.following,
+        created_at: userData.created_at,
+      },
+      repository: {
+        name: repo,
+        owner: owner,
+        full_name: repoFull,
+      },
+      contributions: {
+        total_commits: totalCommits,
+        total_contributions: contributor.contributions,
+        first_commit_date: firstCommitDate,
+        last_commit_date: lastCommitDate,
+        recent_commits_30_days: recentCommits.length,
+      },
+      statistics: {
+        lines_added: totalStats.additions,
+        lines_deleted: totalStats.deletions,
+        total_changes: totalStats.total,
+      },
+      topCommit: topCommit
+        ? {
+            sha: topCommit.sha,
+            message: topCommit.message,
+            date: topCommit.date,
+            additions: topCommit.additions,
+            deletions: topCommit.deletions,
+            total_changes: topCommit.total,
+            files_changed: topCommit.files.length,
+          }
+        : null,
+      recentCommits: allCommits.slice(0, 5).map((c) => ({
+        sha: c.sha,
+        message: c.commit.message,
+        date: c.commit.author.date,
+        url: c.html_url,
+      })),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: contributorData,
+    });
+  } catch (error) {
+    console.error("Error fetching contributor data:", error);
+
+    if (error.response?.status === 404) {
+      return next(
+        AppError.notFound("Repository or contributor not found on GitHub")
+      );
+    }
+
+    if (error.response?.status === 403) {
+      return next(
+        AppError.forbidden(
+          "GitHub API rate limit exceeded. Please try again later."
+        )
+      );
+    }
+
+    return next(
+      AppError.internal("Failed to fetch contributor data from GitHub")
+    );
+  }
+});
+
+
+
+// Helper function to determine contribution level (0-4, like GitHub)
+function getContributionLevel(count) {
+  if (count === 0) return 0;
+  if (count <= 2) return 1;
+  if (count <= 5) return 2;
+  if (count <= 9) return 3;
+  return 4;
+}
