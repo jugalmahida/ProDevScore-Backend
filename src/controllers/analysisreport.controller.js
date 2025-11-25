@@ -383,7 +383,7 @@ export const getContributorsData = asyncHandler(async (req, res, next) => {
 });
 
 export const getContributorData = asyncHandler(async (req, res, next) => {
-  const { login, githubUrl } = req.body;
+  const { login, githubUrl } = req.query;
 
   if (!login || !githubUrl) {
     return next(AppError.badRequest("Github Url or username is missing"));
