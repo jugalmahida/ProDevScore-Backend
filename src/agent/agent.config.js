@@ -59,11 +59,9 @@ const codeReviewOutputGuardrailAgent = new Agent({
   name: "Output Guardrail For Code Review",
   model: "sonar",
   instructions: `
-    Validate that the output strictly matches:
-    {
+    Validate that the output matches:
       summary: string (concise, based primarily on the provided diff),
       overall_score: number 0-100
-    }
     Rules:
     - Summary should be brief and mainly reflect the diff.
     - No extra fields, no markdown, no explanations.
